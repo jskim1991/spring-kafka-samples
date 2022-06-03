@@ -86,8 +86,3 @@ class SampleProducerWithCallbackTests {
         verify(mockProducerCallback).onFailure(ex);
     }
 }
-
-
-/**
- * https://stackoverflow.com/questions/56248612/how-to-write-unit-test-case-for-adding-callback-for-listenablefuture
- */
