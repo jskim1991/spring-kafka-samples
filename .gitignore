@@ -33,3 +33,4 @@ build/
 .vscode/
 
 kafka_2.13-3.2.0/logs
+kafka_2.13-3.2.0
