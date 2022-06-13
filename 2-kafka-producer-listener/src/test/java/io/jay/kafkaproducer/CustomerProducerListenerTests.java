@@ -1,22 +1,27 @@
 package io.jay.kafkaproducer;
 
-import io.jay.kafkaproducer.listener.CustomProducerListener;
-import org.junit.jupiter.api.BeforeEach;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.support.KafkaHeaders;
+import org.springframework.kafka.support.ProducerListener;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.support.MessageBuilder;
 import org.springframework.test.context.ContextConfiguration;
 
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.mockito.ArgumentCaptor.*;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 @SpringBootTest
@@ -24,32 +29,29 @@ import static org.mockito.Mockito.verify;
 @ContextConfiguration(classes = {KafkaTestContainerConfiguration.class})
 class CustomerProducerListenerTests {
 
+    @SpyBean
+    ProducerListener mockCustomProducerListener;
+
     @Autowired
-    ProducerFactory<String, String> producerFactory;
-
-    @Mock
-    CustomProducerListener mockCustomProducerListener;
-
-    KafkaTemplate<String, String> kafkaTemplate;
-
-    private String testTopic = "topic-1";
-
-    @BeforeEach
-    void setup() {
-        kafkaTemplate = new KafkaTemplate<>(producerFactory);
-        kafkaTemplate.setProducerListener(mockCustomProducerListener);
-    }
+    KafkaTemplate<?, ?> kafkaTemplate;
 
     @Test
-    void test_onSuccess_isInvoked() throws InterruptedException, ExecutionException {
+    void test_onSuccess_isInvoked() throws InterruptedException, ExecutionException, TimeoutException {
         Message<String> message = MessageBuilder.withPayload("message payload")
-                .setHeader(KafkaHeaders.TOPIC, testTopic)
+                .setHeader(KafkaHeaders.TOPIC, "topic-1")
                 .build();
 
 
         kafkaTemplate.send(message).get();
 
 
-        verify(mockCustomProducerListener).onSuccess(any(), any());
+        ArgumentCaptor<ProducerRecord> producerRecordArgument = forClass(ProducerRecord.class);
+        ArgumentCaptor<RecordMetadata> recordMetadataArgument = forClass(RecordMetadata.class);
+        verify(mockCustomProducerListener, timeout(1000L)).onSuccess(producerRecordArgument.capture(), recordMetadataArgument.capture());
+
+        ProducerRecord producerRecord = producerRecordArgument.getValue();
+        assertThat(producerRecord.topic(), equalTo("topic-1"));
+        RecordMetadata recordMetadata = recordMetadataArgument.getValue();
+        assertThat(recordMetadata.offset(), equalTo(0L));
     }
 }
